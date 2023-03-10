@@ -1,0 +1,195 @@
+---
+title: "Multi-ANOVA project_Chi Nguyen"
+output:
+  pdf_document: default
+  html_document: default
+date: '2022-06-20'
+---
+
+## Introduction:
+
+In this project, I analyse the "engineer.csv" data. This data is about salary of different engineer profession in different regions of the US.
+
+The dependent variable is the "salary", and the 2 independent categorical variables are "Profession", "Region".
+
+I will do a multi-ANOVA analysis to have an understanding about the data and the interaction inside it.
+
+## The Analysis:
+
+Firstly, I load the libraries:
+
+```{r}
+library(devtools)
+library(qdata)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+```
+
+Load 'engineer.csv' data set:
+
+```{r}
+setwd("~/Documents/DATA SCIENCE/MSDS/03. MSMS 660/06. Week 6/In class")
+engineerdt <- read.csv(file = 'engineer.csv',sep=",", header=T)
+```
+
+Check structure of dt:
+
+```{r}
+dim(engineerdt)
+```
+
+The data has 4 columns and 180 rows.
+
+Check the class of each variables:
+
+```{r}
+str(engineerdt)
+```
+
+The class looks good. But the "X" column has no meaning to the analysis since it's jus the number order. So, I will remove it.
+
+```{r}
+engineerdt <- engineerdt[-c(1)]
+dim(engineerdt)
+str(engineerdt)
+```
+
+The data looks good now and is ready for the analysis.
+
+Convert the 2 independent variables (Profession, Region) to factors:
+
+```{r}
+engineerdt$Profession <- as.factor(engineerdt$Profession)
+engineerdt$Region <- as.factor(engineerdt$Region)
+```
+
+Double check the class of 2 those variables:
+
+```{r}
+str(engineerdt)
+```
+
+Now, let's check on which Profession and City that have the highest salary:
+
+But first, plot histogram of Salary to have a surfing view on the Salary data distribution:
+
+```{r}
+hist(engineerdt$Salary)
+```
+
+According to the plot, most of people's salary are in the range from 70k to 120k.
+
+Plot Salary vs the 2 other factors:
+
+```{r}
+boxplot(Salary ~ Profession,data=engineerdt, main="Salary vs Profession",
+        xlab="Name of Profession", ylab="Salary")
+boxplot(Salary ~ Region,data=engineerdt, main="Salary vs Region",
+        xlab="Name of Region", ylab="Salary")
+```
+
+Plot Individual Boxplots with means on them:
+
+```{r}
+ggplot(engineerdt, aes(x = Profession, y = Salary)) +  
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", col = "red") +  # Add points to plot
+  stat_summary(fun = mean, geom = "text", col = "red",     # Add text to plot
+               vjust = 1.5, aes(label = paste("Mean:", round(..y.., digits = 1))))
+
+ggplot(engineerdt, aes(x = Region, y = Salary)) +  
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", col = "red") +  # Add points to plot
+  stat_summary(fun = mean, geom = "text", col = "red",     # Add text to plot
+               vjust = 1.5, aes(label = paste("Mean:", round(..y.., digits = 1))))
+```
+
+According to the boxplots:
+
+-   We can see that there's probably a significant difference between average salary of different professions but not really significant between different regions.
+
+-   In terms of Profession, the average salary of Data Scientist is the highest comparing to the 2 others profession.
+
+-   In terms of Region, engineers living in San Francisco have the highest average salary, but not much higher than Seattle.
+
+Create interaction plot looking at Profession and Region:
+
+```{r}
+interaction.plot(x.factor = engineerdt$Profession,
+                 trace.factor = engineerdt$Region, 
+                 response = engineerdt$Salary,
+                 fun = mean, 
+                 type = "b",  # shows each point
+                 main = "Interaction Plot",
+                 legend = TRUE,
+                 trace.label = "Region",
+                 xlab = "Profession",
+                 ylab="Salary",
+                 pch=c(1),
+                 col = c("Red"))
+```
+
+There are two lines intersect, hence we can indicate that there's a considerable interaction between Profession and Region in terms of Salary.
+
+Now, I will double check that interaction by ANOVA:
+
+```{r}
+model <- aov(Salary ~ Profession * Region, data = engineerdt)
+summary(model)
+```
+
+Based on the p-values and a significance level of 0.05, the model tell us key things:
+
+-   The p-value of Profession, and Region are \<2e-16 and 1.64e-07, which indicate that the different Profession or Region are associated with Salary. In other words, salary of different profession or different region are not the same.
+
+-   The p-value of "Profession:Region" is 0.000355, much smaller than 0.05 as expected, hence, there's a significant interaction effect between Profession and Region in terms of Salary. In other words, those 2 factors together interact and affect people's salary.
+
+### TukeyHSD
+
+The p-value has just showed the significant interaction between the 2 factos, now, I will perform TukeyHSD post hoc test to check more into the details:
+
+```{r}
+TukeyHSD(model)
+```
+
+Looking at the p-values, we clearly see that there's many interactive pairs of "Profession" and "Region", but some of them are not interacted. This explain why there's one line that not intersect others in the interaction plot.
+
+Plot the residuals of the fit:
+
+```{r}
+par(mfrow = c(2,2))
+plot(model)
+```
+
+-   Accroding to the Residual vs Fitted plot, we can see that the data is linear since there's no clear pattern here.
+
+-   Normal Q-Q plot shows a normal distribution of the errors with some outliers.
+
+-   In the Scale-Location plot, the residuals are not randomly scattered around the red line, it means that the model probably does not fit the data well.
+
+Perform Shapiro test to see if residuals are normaly distributed:
+
+```{r}
+shapiro.test(engineerdt$Salary)
+```
+
+From the output obtained we can assume normality. The p-value is greater than 0.05. Hence, the distribution of the given data is not different from normal distribution significantly. In other words, the variable"Salary" may be normally distributed as expected, and this information can be used to decide to use a parametric test on this data set.
+
+# Summary:
+
+Firstly, I imported "engineer.csv" data for the analysis about salary of different engineer profession in different regions of the US.
+
+Then I did some cleaning action for the data: checked the structure, changed the class, removed unused column.
+
+Next, I plotted a histogram to have a look at the salary data. According to the plot, most of people's salary are in the range from 70k to 120k.
+
+Next, I plotted boxplots of Salary with each 2 factors (Profession, Region) to check the distribution and the means. There's probably a significant difference between average salary of different professions but not really significant between different regions.
+
+Next, I checked the interaction between 2 factors using the interaction plot. There are two lines intersect, hence we can indicate that there's a considerable interaction between Profession and Region in terms of Salary.
+
+After that, I double checked the result by ANOVA. The p=value results indicate that there's a significant interaction effect between Profession and Region in terms of Salary. Salary of different profession or different region are not the same.
+
+Next, I performed the TukeyHSD post hoc test to check that above result in details. The test shows that there are many interactive pairs of "Profession" and "Region", but some of them are not interacted. This explains why there's one line that not intersect others in the interaction plot.
+
+Finally, I check the residuals of the fit model and then double check the distribution of the residuals by Shapiro test. And the output indicates that variable"Salary" may be normally distributed as expected, and this information can be used to decide to use a parametric test on this data set.
